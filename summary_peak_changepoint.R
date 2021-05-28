@@ -283,7 +283,6 @@ for(d in fls){
 
 
 
-
 PCA[is.na(PCA)] <-0
 length(PCA)
 cor(PCA%>%select(-d,-activity))
@@ -296,8 +295,6 @@ summary_peak_changepoint
 total_PCA
 total_PCA<-total_PCA$rotation[,1:3]
 
-
-'
 #정보추출
 id_f<-function(x){
   exp_no<-unlist(regmatches(x,gregexpr("[[:digit:]]+",x)[1]))[1]
