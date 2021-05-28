@@ -1,7 +1,5 @@
 setwd('C:/Users/hansung/Desktop/저장')
 getwd()
-load("peak_total.RData")
-load("sensor_total.RData")
 load("sensor_peak_total.RData")
 
 #peak_final2 : 피크 전체데이터
