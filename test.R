@@ -66,7 +66,3 @@ server <- function(input, output, session){
 }
 
 shinyApp(ui=ui, server=server)
-
-#setwd('C:/Users/hansung/Desktop/shiny')
-#save.image("20171489.RData")
-#load("20171489.RData")
