@@ -2,13 +2,6 @@ setwd('C:/Users/hansung/Desktop/저장')
 getwd()
 load("summary_peak_changepoint.RData")
 
-#peak_final2 : 피크 전체데이터
-#HAR_total 데이터를 이용하여 통계특징 추출하기 HAR_summary_extend
-#ch_pt : 변화 전체 데이터
-
-#센서와 하토탈 합쳐 ==> 모델링 => 정확도 추출 => word 작성
-#전체 데이터
-
 #변수, label 나누기
 #불필요한 데이터파일경로, 동작센서 제거
 data_feature <- summary_peak_changepoint%>%select(-d,-activity) %>% data.matrix
@@ -40,7 +33,7 @@ test_matrix <- xgb.DMatrix(data = test_data, label = test_label)
 params <- list("objective" = "multi:softprob", "num_class" = length(unique(train_label)),
                eta = 0.3, max_depth = 5)
 model <- xgboost(params = params, data = train_matrix, nrounds = 100,
-                   nfold = 10, verbose = F, maximize = T)
+                 nfold = 10, verbose = F, maximize = T)
 
 #모델 학습 후, 평가
 pred <- predict(model, test_matrix)
@@ -56,7 +49,13 @@ sum(fold_pred$predict != fold_pred$label) #0 errors
 predict <- as.factor(fold_pred$predict)
 actual <- as.factor(fold_pred$label) 
 library(caret)
-confusionMatrix(predict, actual)
+xgboost_pred <- confusionMatrix(predict, actual)
 
-xgb.plot.importance(importance_matrix = xgb.importance(colnames(train_matrix), model))
+importance_feature <- xgb.plot.importance(importance_matrix = xgb.importance(colnames(train_matrix), model))
+
+svm_model<-svm(train_label~., data=train_data)
+b<-predict(svm_model, test_data)
+
+confusionMatrix(as.factor(b),as.factor(test_label+1))
+
 
