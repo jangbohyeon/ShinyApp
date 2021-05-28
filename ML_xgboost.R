@@ -1,6 +1,6 @@
 setwd('C:/Users/hansung/Desktop/저장')
 getwd()
-load("sensor_peak_total.RData")
+load("summary_peak_changepoint.RData")
 
 #peak_final2 : 피크 전체데이터
 #HAR_total 데이터를 이용하여 통계특징 추출하기 HAR_summary_extend
@@ -9,45 +9,54 @@ load("sensor_peak_total.RData")
 #센서와 하토탈 합쳐 ==> 모델링 => 정확도 추출 => word 작성
 #전체 데이터
 
-HAR_summary_extend <- HAR_total %>% group_by(d, id, exp_no, activity) %>% 
-  summarize_at(.vars=c("maguserAcceleration", "magrotationRate"),.funs = c(mean,min,max,sd,skewness,rms,rss,IQR,e1071::kurtosis))
+#변수, label 나누기
+#불필요한 데이터파일경로, 동작센서 제거
+data_feature <- summary_peak_changepoint%>%select(-d,-activity) %>% data.matrix
+str(data_feature)
+test <- summary_peak_changepoint$activity
+#ifelse를 이용하여 숫자로 변경
+label_n <- ifelse("dws"==test,0,ifelse("jog"==test,1,ifelse("sit"==test,2,ifelse("std"==test,3,ifelse("ups"==test, 4,ifelse("wlk"==test,5,test))))))
+label_n <- as.numeric(label_n)
+#데이터 train/test 로 분할 -> 분리한 train(train, label), test(test, label)를 각각 하나의 매트릭스로 만들기 
+train_index <- caret::createDataPartition(y = summary_peak_changepoint$activity, p = 0.70, list = FALSE)
+train_data <- data_feature[train_index, ]
+train_label <- label_n[train_index[,1]]
+train_matrix <- xgb.DMatrix(data = train_data, label = train_label)
 
-for(d in fls){
-  f <- get(d)
-  f <- f%>%select(magrotationRate, maguserAcceleration)
-  cfR <- crest(f$magrotationRate,50,plot=TRUE)
-  cfA <- crest(f$maguserAcceleration,50,plot=TRUE)
-  temp <- rbind(temp,data.frame(d, cfR=cfR$C, cfA=cfA$C))
-  rslt_mean <- sapply(f%>%select(magrotationRate, maguserAcceleration), cpt.mean)
-  rslt1_cpt1 <- cpts(rslt_mean$magrotationRate)
-  rslt1_cpt2 <- cpts(rslt_mean$maguserAcceleration)
-  rslt_var <- sapply(f%>%select(magrotationRate, maguserAcceleration), cpt.var)
-  rslt2_cpt1 <- cpts(rslt_var$magrotationRate)
-  rslt2_cpt2 <- cpts(rslt_var$maguserAcceleration)
-  rslt_meanvar <- sapply(f%>%select(magrotationRate, maguserAcceleration), cpt.meanvar)
-  rslt3_cpt1 <- cpts(rslt_meanvar$magrotationRate)
-  rslt3_cpt2 <- cpts(rslt_meanvar$maguserAcceleration)
-  
-  ch_pt <- rbind(ch_pt, data.frame(d, cp1=length(rslt1_cpt1),cp2=length(rslt1_cpt2),cp3=length(rslt2_cpt1),
-                                   cp4=length(rslt2_cpt2),cp5=length(rslt3_cpt1),cp6=length(rslt3_cpt2)))
-}
-#불필요한 변수 제거
-summary <- HAR_summary_extend %>% ungroup() %>% select(-id, -exp_no)
-peak <- peak_final2%>%ungroup()%>%select(-exp_no,-id)
-changepoint <- ch_pt %>% ungroup() %>% select(-exp_no, -id)
-summary(summary)
+# test data 
+test_data <- data_feature[-train_index, ]
+test_label <- label_n[-train_index[,1]]
+test_matrix <- xgb.DMatrix(data = test_data, label = test_label)
 
-summary_peak_data <- merge(summary, peak, by=c("d","activity"))
-summary_peak_data <- summary_peak_data %>% select(-d) 
-summary_peak_changepoint <- merge(summary_peak_data, changepoint, by=c("d","activity"))
-summary_peak_changepoint <- summary_peak_changepoint %>% select(-d) 
+#xgboost 모델 사용, 10-fold 사용, 필요한 파라메터 입력
+#eta : 학습단계별 가중치를 어느정도 적용할지 0~1사이 입력
+#max_path : 의사결정나무 마지막 깊이
+#num_class : label 개수 몇개인지
+#objective : 목적
+#nfold : train과 validation을 몇개로 쪼갤지
+#nround : iteration이 몇번 반복할 건지 
+#verbose : 매 학습시 결과 출력 여부 T/F
+#maximize : 결과값 최대화
+params <- list("objective" = "multi:softprob", "num_class" = length(unique(train_label)),
+               eta = 0.3, max_depth = 5)
+model <- xgboost(params = params, data = train_matrix, nrounds = 100,
+                   nfold = 10, verbose = F, maximize = T)
 
+#모델 학습 후, 평가
+pred <- predict(model, test_matrix)
+#정답과 비교하기 위해, label 개수만큼 matrix 정렬 (가로 6개)
+pred <- matrix(pred, ncol=length(unique(train_label)), byrow = TRUE)
+#정답과 예측 결과 비교
+fold_pred <- data.frame(pred) %>% mutate(predict = max.col(., ties.method = "last"),label = test_label + 1)
 
-#학습
-RF <- make_Weka_classifier("weka/classifiers/trees/RandomForest")
-total_model <- RF(as.factor(activity)~., data=summary_peak_changepoint)
-summary(total_model)
-#평가
-e_ch <- evaluate_Weka_classifier(total_model, numFolds = 10, complexity = TRUE, class=TRUE)
-e_ch
+table(fold_pred$predict, fold_pred$label)
+
+sum(fold_pred$predict != fold_pred$label) #0 errors
+
+predict <- as.factor(fold_pred$predict)
+actual <- as.factor(fold_pred$label) 
+library(caret)
+confusionMatrix(predict, actual)
+
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(train_matrix), model))
 
