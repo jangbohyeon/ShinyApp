@@ -315,15 +315,7 @@ summary(summary_peak_changepoint)
 
 summary_peak_changepoint <- summary_peak_changepoint %>% ungroup() %>% select(-d)
 
-RF <- make_Weka_classifier("weka/classifiers/trees/RandomForest")
-summary_peak_changepoint_model <- RF(as.factor(activity)~., data=summary_peak_changepoint)
-summary(summary_peak_changepoint_model)
 
-
-#평가
-e_model <- evaluate_Weka_classifier(summary_peak_changepoint_model, numFolds = 10, complexity = TRUE, class=TRUE)
-e_model
-
+#저장
 save.image("summary_peak_changepoint_model.RData")
-load("summary_peak_changepoint_model.RData")
 
