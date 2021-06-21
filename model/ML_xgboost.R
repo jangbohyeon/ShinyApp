@@ -51,6 +51,7 @@ actual <- as.factor(fold_pred$label)
 library(caret)
 xgboost_pred <- confusionMatrix(predict, actual)
 
+#변수 중요도 확인
 importance_feature <- xgb.plot.importance(importance_matrix = xgb.importance(colnames(train_matrix), model))
 
 svm_model<-svm(train_label~., data=train_data)
