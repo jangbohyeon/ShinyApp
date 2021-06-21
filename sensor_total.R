@@ -1,5 +1,5 @@
 #경로지정
-setwd("C:/Users/hansung/Desktop/A_DeviceMotion_data/A_DeviceMotion_data")
+setwd("C:/")
 
 #경로 확인
 d <- getwd()
